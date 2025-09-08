@@ -1,0 +1,99 @@
+---
+title: "SOC 756: Problem Set 1"
+
+author: 
+  - "Mateo Frumholtz"
+  
+date: "`r Sys.Date()`"
+date-format: long
+
+format: 
+  pdf:
+    fig-pos: "H"
+    number-sections: true
+    toc: true
+    colorlinks: true
+
+execute:
+  echo: false
+  warning: false
+  error: false
+  
+cap-location: bottom
+---
+
+
+```{r}
+
+rm(list = ls())
+
+# Install Needed Packages -------------------------------------------------
+
+library(tidyverse)
+library(readxl)
+library(summarytools)
+library(here)
+library(ggtext)
+library(gt)
+library(gtExtras)
+
+# Import Datasets ---------------------------------------------------------
+
+ps1 <- read.csv(here("Data/Wisc Demography/ps1_data_F2023.csv"))
+
+```
+
+
+1. Table 1 (next page) contains deaths by age for French males in 1985. These data also include
+mid-year population estimates and a set of nax values for French males for 1985. Table 1 is on
+our webpage in .csv format.
+
+a. Use these data to construct a life table for the male population. Do this by performing
+operations on the vectors. You will need to calculate and fill in the following life table
+columns: nqx; lx; ndx; nLx; nmx; Tx; and ex.
+
+b. Graph the following life table functions using either plot() or ggplot(): lx; ndx; and nmx .
+What do you observe?
+
+c. What was life expectancy at age 40? How would you interpret this number?
+
+d. What was the probability of surviving from birth to age 30?
+
+e. What was the probability of surviving to age 65 for those who survived to age 30?
+
+f. What was the probability that a newborn would die between 50 and 55?
+
+g. How many years could a newborn expect to live in the interval 15-65?
+
+h. If you only had the fourth column of Table 1, would you be able to distinguish this
+population as one with high mortality or low mortality? (What nax value in particular
+might help distinguish between the two?)
+
+i. If the French population were stationary, what would be the crude death rate?
+
+j. Extra credit part 1: push your code to your Github page and list the URL in your
+submitted answers.
+
+k. Extra credit part 2: install the Lifetables package in R. With nmx in hand, use lt.mx() to
+populate the other functions. Check your work in 1(a), noting discrepancies if you set
+nax=NULL.
+
+
+2. Think about the social phenomena / processes that most interest you. Might any of these
+processes be measured in the form of a lifetable?
+
+If yes:
+
+a. What events would constitute “births” and “deaths”?
+
+b. What could you learn from using a lifetable?
+
+c. Where might you start looking for data to identify the size of the population at risk and
+the age-specific “death” rates or probabilities?
+
+d. What issues might limit how the information produced in your lifetable can be
+interpreted?
+
+If no, describe the issues that would make the lifetable an inappropriate analytical tool for the
+social processes that you study.
+
