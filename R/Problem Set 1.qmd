@@ -332,7 +332,7 @@ dtr <- demCore::gen_lx_from_qx(
 
 
 ```{r comp_tab}
-#| tbl-cap: "Generated "
+#| tbl-cap: "Comparing manual and package-generated life table function estimates using demCore R package."
 #| label: tbl-gen_lx
 
 dtr |>
