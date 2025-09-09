@@ -283,13 +283,8 @@ A newborn can expect to live 45.91713 person-years in the 15-65 year interval.
 
 **h. If you only had the fourth column of Table 1, would you be able to distinguish this population as one with high mortality or low mortality? (What nax value in particular might help distinguish between the two?)**
 
+With only the nax column, we might be able to compare populations' mortality. Crudely, we could compare where in the range they fall, with those falling closer to 0 representing higher likely mortality rates for that age group. Specifically, the first nax value where x = 0 can tell us about child mortality rates and compare it to other populations.
 
-
-```{r}
-
-ps1
-
-```
 
 **i. If the French population were stationary, what would be the crude death rate?**
 
@@ -371,18 +366,23 @@ dtr |>
 
 **2. Think about the social phenomena / processes that most interest you. Might any of these processes be measured in the form of a lifetable? If yes:**
 
+Maybe we could use life tables to understand the demographic profile of evictions.
 
 **a. What events would constitute “births” and “deaths”?**
 
+Births would still be births, but deaths would actually be evictions.
 
 **b. What could you learn from using a lifetable?**
 
+We don't have that much information on the demographics of tenants that are evicted, so this would be able to tell us sex and age specific eviction rates.
 
 **c. Where might you start looking for data to identify the size of the population at risk and the age-specific “death” rates or probabilities?**
 
+This is the hard part. I know that Nick Graetz has done some work on this effort using the Federal Statistical Research Data Centers, so that might be the best source of information, linked with eviction data from Princeton's Eviction lab.
 
 **d. What issues might limit how the information produced in your lifetable can be interpreted?**
 
+I think all that we could say about this would be limited age-specific eviction rates, with data source-specific limitations. I'm also not sure how different this would be from a cox-regression model? 
 
 ~~**If no, describe the issues that would make the lifetable an inappropriate analytical tool for the social processes that you study.**~~
 
