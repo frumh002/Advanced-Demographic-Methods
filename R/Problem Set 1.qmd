@@ -45,20 +45,25 @@ ps1 <- read.csv(here("Data/ps1_data_F2023.csv")) |>
 ```
 
 
+```{r fonts} 
+
+knitr::opts_chunk$set(dev = "ragg_png", dpi = 400)
+
+```
 
 
 **1. Table 1 (next page) contains deaths by age for French males in 1985. These data also include mid-year population estimates and a set of nax values for French males for 1985. Table 1 is on our webpage in .csv format.**
 
 **a. Use these data to construct a life table for the male population. Do this by performing operations on the vectors. You will need to calculate and fill in the following life table columns: nqx; lx; ndx; nLx; nmx; Tx; and ex.**
 
-```{r life_table_cols}
+```{r life_table}
 #| echo: true
 
 # nNx = midyear population
 # nDx = deaths between ages x and x + n
 # nmx ~ nDx/nNx
 
-ps1 |>
+lt <- ps1 |>
   arrange(x) |>
   mutate(
     time_diff = lead(x) - x,
@@ -85,7 +90,13 @@ ps1 |>
     ),
     Tx = rev(cumsum(rev(nLx))),
     ex = Tx / lx
-  ) |>
+  )
+
+```
+
+```{r life_table_cols}
+
+lt |>
   select(x, nqx, lx, ndx, nLx, nmx, Tx, ex) |>
   gt() |>
   fmt_number(
@@ -104,36 +115,15 @@ ps1 |>
 
 **b. Graph the following life table functions using either plot() or ggplot(): lx; ndx; and nmx. What do you observe?**
 
-```{r life_plots}
+@fig-lt_french below shows the three following life table functions for the French male population in 1985: lx (the number of people still living), ndx (number of people dying between each age interval), and nmx (the death rate for each cohort). We can see that these three functions are largely complementary, as expected. As age advances, lx declines at a steady rate as ndx starts to increase at a steady rate. Towards later life, we see a lower lx and higher ndx and nmx, signaling the higher mortality rate of older cohorts and the fewer number of them left alive. On an interesting note related to these functions, we observe some major demographic mortality trends very clearly: the early life increased mortality rate, the young adult mortality bump, and the later life steady mortality increase.
 
-ps1 |>
-  arrange(x) |>
-  mutate(
-    time_diff = lead(x) - x,
-    nmx = nDx / nNx,
-    nqx = (time_diff * nmx) / (1 + ((time_diff - nax) * nmx)),
-    nqx = case_when(
-      is.na(nqx) ~ 1,
-      TRUE ~ nqx
-    ),
-    npx = 1 - nqx,
-    lx = accumulate(npx, `*`, .init = 100000)[-1],
-    lx = lag(lx, default = 100000),
-    ndx1 = lx - lead(lx),
-    # Other option for ndx
-    # ndx1 = case_when(
-    #     is.na(ndx1) ~ lx,
-    #     TRUE ~ ndx1
-    # ),
-    ndx = nqx * lx,
-    nLx = (time_diff * lead(lx)) + (nax * ndx),
-    nLx = case_when(
-      is.na(nLx) ~ lx / nmx,
-      TRUE ~ nLx
-    ),
-    Tx = rev(cumsum(rev(nLx))),
-    ex = Tx / lx
-  ) |>
+```{r life_plots}
+#| fig-width: 8
+#| fig-height: 8
+#| fig-cap: "Life table functions for French male population in 1985. The top panel shows lx, the middle panel shows ndx, and the bottom panel shows nmx."
+#| label: fig-lt_french
+
+lt |>
   select(x, lx, ndx, nmx) |>
   pivot_longer(c(-x), names_to = "type", values_to = "est") |>
   ggplot() +
@@ -141,38 +131,243 @@ ps1 |>
   geom_line(
     linewidth = 1
   ) +
-  facet_wrap(~type, scales = "free", nrow = 3)
+  scale_color_manual(
+    values = c(
+      "#2c7da0",
+      "#ff8fa3",
+      "#FFC845"
+    )
+  ) +
+  facet_wrap(~type, scales = "free", nrow = 3) +
+  scale_y_continuous(
+    labels = scales::comma
+  ) +
+  labs(
+    title = "Life Table Functions",
+    subtitle = "French Males 1985",
+    x = "Age",
+    y = "",
+    caption = "Data: 1985 French Male Life Tables"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.margin = margin(10, 10, 10, 10),
+    plot.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    panel.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    legend.position = "none",
+    legend.title = element_blank(),
+    legend.key.height = unit(0.5, "lines"),
+    legend.key.width = unit(7, "lines"),
+    legend.text.position = "top",
+    legend.text = element_markdown(
+      face = "bold",
+      size = 10,
+      margin = margin(t = 5),
+      family = "Fira Sans"
+    ),
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 14,
+      color = "black",
+      face = "bold",
+      family = "Fira Sans",
+      margin = margin(5, 0, 10, 0)
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      size = 10,
+      color = "grey30",
+      margin = margin(5, 0, 10, 0),
+      family = "Fira Sans"
+    ),
+    plot.caption = element_text(
+      color = "grey30",
+      margin = margin(t = 10, b = 0, unit = "pt"),
+      hjust = 1,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    strip.text = element_text(
+      color = "grey30",
+      hjust = 0.5,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.title = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      margin = margin(5, 0, 0, 0),
+      family = "Fira Sans"
+    ),
+    axis.text = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.line = element_line(
+      color = "grey30",
+    )
+  )
 
 ```
 
 **c. What was life expectancy at age 40? How would you interpret this number?**
 
+In 2985, the life expectancy for French males at age 40 was 34.12 more years. This means that on average, French males that were 40 could expect to live to 74.12 years of age.
+
+```{r life_exp}
+
+lt |>
+  filter(x == 40) |>
+  select(x, ex) |>
+  gt() |>
+  tab_header(
+    title = "Life Expectancy at Age 40"
+  )
+
+```
 
 **d. What was the probability of surviving from birth to age 30?**
 
+The probability of surviving from birth to age 30 was 0.9652159
+
+```{r probs_30}
+#| echo: true
+
+lt$lx[lt$x == 30] / lt$lx[lt$x == 0]
+
+```
 
 **e. What was the probability of surviving to age 65 for those who survived to age 30?**
 
+The probability of surviving to age 65 for those that survived to age 30 was 0.7533727.
+
+```{r probs_65}
+#| echo: true
+
+lt$lx[lt$x == 65] / lt$lx[lt$x == 30]
+
+```
 
 **f. What was the probability that a newborn would die between 50 and 55?**
 
+The probability that a newborn will die between 50 and 55 is 0.04124974.
+
+```{r probs_death_50}
+#| echo: true
+
+(lt$lx[lt$x == 50] - lt$lx[lt$x == 55]) / lt$lx[lt$x == 0]
+
+```
 
 **g. How many years could a newborn expect to live in the interval 15-65?**
 
+A newborn can expect to live 45.91713 person-years in the 15-65 year interval.
+
+```{r years_live}
+#| echo: true
+
+(lt$Tx[lt$x == 15] - lt$Tx[lt$x == 65]) / lt$lx[lt$x == 0]
+
+```
 
 **h. If you only had the fourth column of Table 1, would you be able to distinguish this population as one with high mortality or low mortality? (What nax value in particular might help distinguish between the two?)**
 
 
+
+```{r}
+
+ps1
+
+```
+
 **i. If the French population were stationary, what would be the crude death rate?**
 
-The CDR would be...
+The CDR would be 14.023 deaths per 1,000 people.
+
+```{r cdr}
+#| echo: true
+
+(1 / lt$ex[lt$x == 0]) * 1000
+
+```
 
 **j. Extra credit part 1: push your code to your Github page and list the URL in your submitted answers.**
 
 The github link for this class can be found [here](https://github.com/frumh002/Advanced-Demographic-Methods/tree/main).
 
-~~**k. Extra credit part 2: install the Lifetables package in R. With nmx in hand, use lt.mx() to populate the other functions. Check your work in 1(a), noting discrepancies if you set nax=NULL.**~~
+**k. Extra credit part 2: install the Lifetables package in R. With nmx in hand, use lt.mx() to populate the other functions. Check your work in 1(a), noting discrepancies if you set nax=NULL.**
 
+We can use the [demCore](https://github.com/ihmeuw-demographics/demCore) package available on GitHub to check some of our estimates. Overall, as @tbl-gen_lx shows, our estimates for lx and qx appear to be consistent.
+
+```{r gen_lx_prep}
+
+# We need to have qx created already (not shown here)
+tr <- lt |>
+  mutate(
+    age_end = lead(x),
+    age_start = x,
+  ) |>
+  rename(qx = nqx) |>
+  select(age_start, age_end, qx)
+
+
+```
+
+
+```{r code_gen_lx}
+#| echo: true
+
+dtr <- demCore::gen_lx_from_qx(
+  data.table::as.data.table(tr),
+  id_cols = c("age_start", "age_end")
+)
+
+```
+
+
+```{r comp_tab}
+#| tbl-cap: "Generated "
+#| label: tbl-gen_lx
+
+dtr |>
+  as_tibble() |>
+  left_join(lt, by = c("age_start" = "x")) |>
+  mutate(
+    nqx_diff = nqx - qx,
+    lx.x = round(lx.x * 100000, 2),
+    lx.y = round(lx.y, 2),
+    lx_diff = lx.x - lx.y
+  ) |>
+  select(
+    x = age_start,
+    package_nqx = nqx,
+    manual_nqx = qx,
+    nqx_diff,
+    package_lx = lx.x,
+    manual_lx = lx.y,
+    lx_diff
+  ) |>
+  gt() |>
+  fmt_number(
+    columns = c(package_nqx, manual_nqx),
+    decimals = 3
+  ) |>
+  tab_header(
+    title = "Comparing Manual Life Table Functions with demCore"
+  )
+
+```
 
 **2. Think about the social phenomena / processes that most interest you. Might any of these processes be measured in the form of a lifetable? If yes:**
 
