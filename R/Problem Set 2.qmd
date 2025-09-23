@@ -1,0 +1,589 @@
+---
+title: "SOC 756: Problem Set 2"
+
+author: 
+  - "Mateo Frumholtz"
+
+bibliography: references.bib
+
+date: "`r Sys.Date()`"
+date-format: long
+
+format: 
+  pdf:
+    fig-pos: "H"
+    number-sections: true
+    colorlinks: true
+    geometry: 
+      - margin = 1.25in 
+
+execute:
+  echo: false
+  warning: false
+  error: false
+  
+cap-location: bottom
+---
+
+
+```{r prep}
+rm(list = ls())
+
+# Install Needed Packages -------------------------------------------------
+
+library(tidyverse)
+library(readxl)
+library(summarytools)
+library(here)
+library(ggtext)
+library(gt)
+library(gtExtras)
+library(HMDHFDplus)
+
+# Import Datasets ---------------------------------------------------------
+
+ps2 <- read.csv(here("Data/ps2_data_F2023.csv")) |>
+  rename(
+    age = x,
+    pov = proportion_poverty_1.n_x,
+    n = number_sampled_N
+  ) |>
+  mutate(
+    age = case_when(
+      age == "1-5" ~ "1-4",
+      age == "6-9" ~ "5-9",
+      TRUE ~ age
+    ),
+    age = as.numeric(str_extract(age, "^\\d+")),
+    n = as.numeric(gsub(",", "", n))
+  )
+
+blt <- readRDS(file = here("Data/HMD US 2004.rds"))
+
+# Merging life tables with proportions
+
+df <- blt |>
+  left_join(ps2, by = c("age", "sex"))
+
+```
+
+
+```{r fonts} 
+
+knitr::opts_chunk$set(dev = "ragg_png", dpi = 400)
+
+```
+
+
+**The github link for this class and assignment can be found [here](https://github.com/frumh002/Advanced-Demographic-Methods/tree/main).**
+
+
+
+In this problem set, you will be calculating gender differences in the expected duration of years lived in poverty for the United States in 2004. You will calculate variance estimates for these expectancies to determine if the estimates of differences between men and women are statistically meaningful, and at what ages.
+
+
+**1. Sullivan’s method requires high quality lifetable data to construct total person years in each age group. Set up an account on the Human Mortality Database: https://www.mortality.org/ and get the nLx values for U.S. males and U.S. females in 2004 from the 5x1 abridged tables, e.g. for women: https://www.mortality.org/hmd/USA/STATS/fltper_5x1.txt Install the R package HMDHFDplus and get the lifetable values directly: https://cran.r-project.org/web/packages/HMDHFDplus/HMDHFDplus.pdf The commands ask you to supply your user name and password, you’ll still need to sign up at HMD first.**
+
+We can download the HMD files directly from R using the HMDHFDplus R package [@Riffe_2015].
+
+```{r hmd_tbl}
+#| echo: true
+
+# Downloaded with the following script -
+# commented out so I don't have to show my password
+
+# m_lt <- readHMDweb(
+#   CNTRY = "USA",
+#   item = "mltper_5x1",
+#   username = "frumh002@umn.edu"
+# ) |>
+#   filter(Year == 2004) |>
+#   rename(
+#     year = Year,
+#     age = Age
+#   ) |>
+#   select(-OpenInterval) |>
+#   mutate(
+#     sex = "male"
+#   )
+
+# fm_lt <- readHMDweb(
+#   CNTRY = "USA",
+#   item = "fltper_5x1",
+#   username = "frumh002@umn.edu"
+# ) |>
+#   filter(Year == 2004) |>
+#   rename(
+#     year = Year,
+#     age = Age
+#   ) |>
+#   select(-OpenInterval) |>
+#   mutate(
+#     sex = "female"
+#   )
+
+# blt <- rbind(m_lt, fm_lt) |>
+#   mutate(
+#     age = as.numeric(age)
+#   )
+
+```
+
+
+
+**2. I have used General Social Survey data to estimate the poverty prevalence by age separately for men and women. I have defined the poverty prevalence as the proportion living at or below the poverty line at the time of the survey. You will find these values, as well as the size of the sample used to compute them in a table on the class webpage. Because the GSS uses simple random sampling, we should be able to estimate standard errors using the simplified formula made available in Molla, Wagener, and Madans (2001), as opposed to correcting for the sampling scheme with a more complicated approach.**
+
+**(a) Calculate the expected number of years lived in poverty above age x separately for men and women ages 0-100 (using the given intervals).**
+    
+We can use the following equation from @Imai_Soneji_2007 to estimate Sullivan's method for each sex.
+
+$$
+\hat{e}_x^{POV} = \frac{1}{l_x} \sum_{i\epsilon{}x}(1-_{ni}\hat{\pi{_i}})_{ni}L_i
+$$
+
+Where:
+
+- $\hat{e}_x^{POV}$ represents the average years lived in poverty above age x
+- $l_x$ represents the people that are still alive in the interval i
+- $_{ni}\hat{\pi{_i}}$ represents the percent of people living in poverty (to estimate those living in poverty we just use the $_{ni}\hat{\pi{_i}}$ estimate)
+- $_{ni}L_i$ represents the person-years lived in interval i
+
+
+```{r sullivans_pov}
+#| echo: true
+
+pov_lt <- df |>
+  mutate(
+    adj_Lx = Lx * pov
+  ) |>
+  group_by(sex) |>
+  mutate(
+    Tx = rev(cumsum(rev(adj_Lx))),
+    adj_ex = (1 / lx) * Tx
+  ) |>
+  ungroup()
+
+```
+
+```{r sullivans_tbl}
+#| tbl-cap: "Estimated ex for male and females living in poverty in the US, 2004. "
+#| label: tbl-sulli_pov
+
+pov_lt |>
+  select(age, sex, adj_ex) |>
+  pivot_wider(names_from = sex, values_from = adj_ex) |>
+  arrange(age) |>
+  mutate(
+    age = paste0(age, "-", lead(age)),
+    age = case_when(
+      age == "1-5" ~ "1-4",
+      age == "5-10" ~ "5-9",
+      age == "110-NA" ~ "110+",
+      TRUE ~ age
+    )
+  ) |>
+  gt() |>
+  cols_label(
+    age ~ "Age",
+    male ~ "Male",
+    female ~ "Female"
+  ) |>
+  fmt_number(
+    columns = c(male, female),
+    decimals = 2
+  ) |>
+  tab_spanner(
+    label = "ex",
+    columns = c(male, female)
+  ) |>
+  tab_header(
+    title = "Estimated years spent in poverty by sex",
+    subtitle = "United States, 2004"
+  )
+
+```
+
+**(b) Assess whether, at birth, the total expected number of years lived in poverty differs for men and women and whether this difference is statistically significant.**
+
+We can estimate the variance of the prevalence estimates using methods from @Molla_Wagener_Madans_2001 for each sex.
+
+$$
+S^2(_{n}\pi{_x}) = [{_n}{\pi{_x}} * (1 - {_n}{\pi{_x}})] / _{n}N{_x}
+$$
+
+Where:
+
+- $_{n}N{_x}$ represents the number of people used to estimate the sample prevalence in age interval x to x+n
+- $_{n}\pi{_x}$ represents the percent of people living in poverty
+
+We can then use these variance estimates to get the overall variance of $\hat{e}_x$:
+
+$$
+VAR(\hat{e}_x) = \frac{1}{l^2_x}\sum_{i = x}^w{[_x{L^2_i}*S^2(1 - _{n}\pi{_x})]}
+$$
+
+Where:
+
+- $l_x$ represents the people that are still alive in the interval i
+- $_{ni}L_i$ represents the person-years lived in interval i
+- $S^2(1 - _{n}\pi{_x})$ is the variance of the prevalence estimates
+
+```{r variance_est}
+#| echo: true
+#| output: false
+
+pov_var <- pov_lt |>
+  select(age, sex, lx, Lx, pov, n, adj_ex) |>
+  mutate(
+    s = (pov * (1 - pov)) / n,
+    sx = ((Lx^2) * s)
+  ) |>
+  group_by(sex) |>
+  arrange(age) |>
+  mutate(
+    adj_sx = rev(cumsum(rev(sx)))
+  ) |>
+  ungroup() |>
+  mutate(
+    var = (1 / (lx^2)) * adj_sx,
+    se = sqrt(var),
+    conf_low = adj_ex - se,
+    conf_high = adj_ex + se
+  ) |>
+  select(age, sex, adj_ex, var, se, conf_low, conf_high) |>
+  mutate(
+    sex = str_to_title(sex)
+  )
+
+pov_stat <- pov_var |>
+  select(age, sex, adj_ex, var, se) |>
+  mutate(
+    sex = tolower(sex)
+  ) |>
+  pivot_wider(names_from = sex, values_from = c(adj_ex:se)) |>
+  mutate(
+    num_z = adj_ex_female - adj_ex_male,
+    denom_z = se_male + se_female,
+    z = num_z / denom_z,
+    p = 2 * pnorm(q = z, lower.tail = FALSE),
+    pval = case_when(
+      p < 0.001 ~ "< 0.001",
+      p < 0.05 ~ "< 0.05",
+      TRUE ~ "> 0.05"
+    )
+  ) |>
+  select(-denom_z, -p)
+
+```
+
+
+
+
+```{r pov_stats}
+#| tbl-cap: "Statistical findings from expected differences in years spent living in povery between male and females in the US, 2004. "
+#| label: tbl-sulli_pov_stats
+
+pov_stat |>
+  relocate(
+    age,
+    adj_ex_female,
+    adj_ex_male,
+    num_z,
+    var_female,
+    var_male,
+    se_female,
+    se_male,
+    z,
+    pval
+  ) |>
+  gt() |>
+  cols_label(
+    age ~ "Age",
+    num_z ~ "Diff.",
+    contains("male") ~ "Male",
+    contains("female") ~ "Female",
+    z ~ "Z-value",
+    pval ~ "p-value"
+  ) |>
+  tab_spanner(
+    label = "ex",
+    columns = contains("adj_ex")
+  ) |>
+  tab_spanner(
+    label = "Variance",
+    columns = contains("var")
+  ) |>
+  tab_spanner(
+    label = "SE",
+    columns = contains("se")
+  ) |>
+  fmt_number(
+    columns = num_z,
+    decimals = 1
+  ) |>
+  fmt_number(
+    columns = adj_ex_male:adj_ex_female,
+    decimals = 1
+  ) |>
+  fmt_number(
+    columns = var_female:se_male,
+    decimals = 3
+  ) |>
+  fmt_number(
+    columns = z,
+    decimals = 2
+  ) |>
+  tab_header(
+    title = "Statistical test for sex-differences in years spent in poverty",
+    subtitle = "United States, 2004"
+  )
+
+```
+
+
+At birth, males have an estimated 10.6 expected number of years lived in poverty while females have an estimated 16.3 years (@fig-pov_e0). These differences appear to be statistically significant at a p < 0.001 - level (@tbl-sulli_pov_stats). 
+
+
+```{r age_0_pov}
+#| fig-width: 6
+#| fig-height: 5
+#| fig-cap: "Expected number of years lived in poverty at birth by sex in the United States, 2004."
+#| label: fig-pov_e0
+
+pov_var |>
+  filter(age == 0) |>
+  ggplot() +
+  aes(x = sex, y = adj_ex, fill = sex, color = sex) +
+  geom_col(
+    width = 0.35,
+  ) +
+  geom_errorbar(
+    aes(ymin = conf_low, ymax = conf_high),
+    width = 0.05,
+    color = "#355070"
+  ) +
+  geom_text(
+    aes(label = round(adj_ex, 1)),
+    size = 3,
+    vjust = 1,
+    nudge_y = -0.5,
+    family = "Fira Sans",
+    fontface = "bold",
+    color = "#355070"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "#f6bd60",
+      "#f28482"
+    )
+  ) +
+  scale_color_manual(
+    values = c(
+      "#f6bd60",
+      "#f28482"
+    )
+  ) +
+  scale_y_continuous(
+    breaks = seq(0, 18, 2),
+    limits = c(0, 17),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "Expected number of years lived in poverty at birth by sex",
+    subtitle = "United States, 2004",
+    x = "",
+    y = "Number of Years",
+    caption = "Data: 2004 US HDM"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.margin = margin(10, 10, 10, 10),
+    plot.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    panel.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    legend.position = "none",
+    legend.title = element_blank(),
+    legend.key.height = unit(0.5, "lines"),
+    legend.key.width = unit(7, "lines"),
+    legend.text.position = "top",
+    legend.text = element_markdown(
+      face = "bold",
+      size = 10,
+      margin = margin(t = 5),
+      family = "Fira Sans"
+    ),
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 14,
+      color = "black",
+      face = "bold",
+      family = "Fira Sans",
+      margin = margin(5, 0, 10, 0)
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      size = 10,
+      color = "grey30",
+      margin = margin(5, 0, 10, 0),
+      family = "Fira Sans"
+    ),
+    plot.caption = element_text(
+      color = "grey30",
+      margin = margin(t = 10, b = 0, unit = "pt"),
+      hjust = 1,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    strip.text = element_text(
+      color = "grey30",
+      hjust = 0.5,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.title = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      margin = margin(5, 0, 0, 0),
+      family = "Fira Sans"
+    ),
+    axis.text = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.line = element_line(
+      color = "grey30",
+    )
+  )
+
+
+```
+
+
+**(c) Assess these differences at each age interval.**
+
+At each age interval, males have a lower expected number of years lived in poverty than females (@fig-pov_ages). These differences appear to be significant across all age intervals until age 80, at a p < 0.001 level, and until age 90, at a p < 0.05 level (@tbl-sulli_pov_stats). 
+
+```{r pov_ages}
+#| fig-width: 6
+#| fig-height: 6
+#| fig-cap: "Expected number of years lived in poverty by sex in the United States, 2004."
+#| label: fig-pov_ages
+
+pov_var |>
+  ggplot() +
+  aes(x = age, y = adj_ex, color = sex) +
+  geom_linerange(
+    aes(ymin = conf_low, ymax = conf_high),
+    size = 0.7
+  ) +
+  geom_point(
+    size = 2
+  ) +
+  geom_line(
+    size = 0.8
+  ) +
+  scale_color_manual(
+    values = c(
+      "#f6bd60",
+      "#f28482"
+    )
+  ) +
+  scale_y_continuous(
+    breaks = seq(0, 20, 2)
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 110, 5)
+  ) +
+  labs(
+    title = "Expected number of years lived in poverty at birth by sex",
+    subtitle = "United States, 2004",
+    x = "Age",
+    y = "Number of Years",
+    caption = "Data: 2004 US HDM"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.margin = margin(10, 10, 10, 10),
+    plot.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    panel.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    legend.key.height = unit(0.5, "lines"),
+    legend.key.width = unit(7, "lines"),
+    legend.text.position = "top",
+    legend.text = element_markdown(
+      face = "bold",
+      size = 10,
+      margin = margin(t = 5),
+      family = "Fira Sans"
+    ),
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 14,
+      color = "black",
+      face = "bold",
+      family = "Fira Sans",
+      margin = margin(5, 0, 10, 0)
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      size = 10,
+      color = "grey30",
+      margin = margin(5, 0, 10, 0),
+      family = "Fira Sans"
+    ),
+    plot.caption = element_text(
+      color = "grey30",
+      margin = margin(t = 10, b = 0, unit = "pt"),
+      hjust = 1,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    strip.text = element_text(
+      color = "grey30",
+      hjust = 0.5,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.title = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      margin = margin(5, 0, 0, 0),
+      family = "Fira Sans"
+    ),
+    axis.text = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.line = element_line(
+      color = "grey30",
+    )
+  )
+
+```
+
+
+# References
+
+
