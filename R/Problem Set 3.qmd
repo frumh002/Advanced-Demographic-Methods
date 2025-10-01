@@ -1,0 +1,151 @@
+---
+title: "SOC 756: Problem Set 3"
+
+author: 
+  - "Mateo Frumholtz"
+
+bibliography: references.bib
+
+date: "`r Sys.Date()`"
+date-format: long
+
+format: 
+  pdf:
+    fig-pos: "H"
+    number-sections: true
+    colorlinks: true
+    geometry: 
+      - margin = 1.25in 
+
+execute:
+  echo: false
+  warning: false
+  error: false
+  
+cap-location: bottom
+---
+
+
+```{r prep}
+rm(list = ls())
+
+# Install Needed Packages -------------------------------------------------
+
+library(tidyverse)
+library(readxl)
+library(summarytools)
+library(here)
+library(ggtext)
+library(gt)
+library(gtExtras)
+library(HMDHFDplus)
+
+# Import Datasets ---------------------------------------------------------
+
+blt <- readRDS(file = here("Data/HMD US 2005.rds"))
+
+
+```
+
+
+```{r fonts} 
+
+knitr::opts_chunk$set(dev = "ragg_png", dpi = 400)
+
+```
+
+
+
+**1. Approximately 85,000 adolescents turn 16 each year in Wisconsin. Data from Fohr et al., 2005 suggest that the probability of being involved in a non-fatal motor vehicle accident among Wisconsin 16-year-olds is roughly 0.0486. The authors find that the probability declines dramatically with age, reaching 0.0145 by age 30. Assume that, in each year of life, the probability of experiencing a non-fatal motor vehicle accident is equal to 0.062 - 0.000053 x (age2), where age is defined in discrete one-year intervals.**
+
+
+**Acquire an account with the Human Mortality Database and the Human Fertility Database. Use the HMDHFDplus package in R to obtain the 2005 single year age-specific death probabilities from the Human Mortality Database. Answer the following questions:**
+
+```{r hmd}
+#| echo: true
+
+# Used the following code to get the data
+
+# blt <- readHMDweb(
+#   CNTRY = "USA",
+#   item = "bltper_1x1",
+#   username = "frumh002@umn.edu"
+# ) |>
+#   filter(Year == 2005) |>
+#   rename(
+#     year = Year,
+#     age = Age
+#   ) |>
+#   select(-OpenInterval) |>
+#   mutate(
+#     age = as.numeric(age)
+#   )
+
+df <- blt |>
+  mutate(
+    nqxi = 0.062 - (0.000053 * (age^2)),
+    new_px = 1 - (nqxi + qx),
+    new_lx = accumulate(new_px, `*`, .init = 100000)[-1],
+    new_lx = lag(new_lx, default = 100000),
+    ndxi = nqxi * new_lx,
+    ndxi2 = nqxi * lx,
+    npxi = 1 - nqxi,
+    lxi = accumulate(npxi, `*`, .init = 100000)[-1],
+    lxi = lag(lxi, default = 100000)
+  ) |>
+  filter(age <= 31)
+
+```
+
+**a) What proportion of Wisconsinites who live to age 16 will live to age 31 without experiencing a motor vehicle accident?**
+
+Of those who survived to age 16, 59.6% will live to age 31 without experiencing a motor vehicle accident.
+
+```{r acc_1}
+#| echo: true
+
+# The new_lx calculates the number of people who are still alive
+# and haven't yet experienced a motor vehicle accident
+df$new_lx[df$age == 31] / df$new_lx[df$age == 16]
+
+
+```
+
+**b) Among those who live to age 25 accident-free, what is the probability of experiencing an accident by age 31?**
+
+Of those who lived to age 25 accident-free, 12.4% will experience a motor vehicle accident by age 31.
+
+```{r acc_2}
+#| echo: true
+
+# The lxi calculates the number of people who have not experienced
+# motor vehicle accident yet
+# The new_lx calculates the number of people who are still alive
+# and haven't yet experienced a motor vehicle accident
+1 - (df$lxi[df$age == 31] / df$lxi[df$age == 25])
+
+
+```
+
+**c) Among those who survive to age 16, what is the probability of dying without experiencing an accident by age 31?**
+
+Of those who survived to age 16, 1.37% will die by age 31 without experiencing a motor vehicle accident.
+
+```{r acc_3}
+#| echo: true
+
+# The lxV calculates the number of people who have not experienced
+# event yet (death or motor vehicle accident)
+(df$lx[df$age == 16] - df$lx[df$age == 31]) / df$lx[df$age == 16]
+
+```
+
+**d) If the experience of accidents and the probability of dying are process-dependent, is your estimate for C an overestimate or an underestimate of the true probability?**
+
+The probability of folks in accidents is inversely correlated with overall death rate. Given a certain death rate from any cause, the proportion of folks in accidents will be lower the higher the death rate from other causes.
+
+**e) Extra Credit: Push your code to GitHub and share the link with someone from class. Answer here the name of the person(s) to whom you shared the link.**
+
+The github link for this class and assignment can be found [here](https://github.com/frumh002/Advanced-Demographic-Methods/tree/main).
+
+I shared this in our class whatsapp group chat.
