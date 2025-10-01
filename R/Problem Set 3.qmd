@@ -42,7 +42,8 @@ library(HMDHFDplus)
 
 # Import Datasets ---------------------------------------------------------
 
-blt <- readRDS(file = here("Data/HMD US 2005.rds"))
+blt <- readRDS(file = here("Data/HMD US 2005.rds")) |>
+  select(age, qx)
 
 
 ```
@@ -82,18 +83,18 @@ knitr::opts_chunk$set(dev = "ragg_png", dpi = 400)
 #   )
 
 df <- blt |>
+  filter(age >= 16, age <= 31) |>
   mutate(
     nqxi = 0.062 - (0.000053 * (age^2)),
     new_px = 1 - (nqxi + qx),
-    new_lx = accumulate(new_px, `*`, .init = 100000)[-1],
-    new_lx = lag(new_lx, default = 100000),
+    new_lx = accumulate(new_px, `*`, .init = 85000)[-1],
+    new_lx = lag(new_lx, default = 85000),
     ndxi = nqxi * new_lx,
-    ndxi2 = nqxi * lx,
     npxi = 1 - nqxi,
+    dx = qx * new_lx,
     lxi = accumulate(npxi, `*`, .init = 100000)[-1],
     lxi = lag(lxi, default = 100000)
-  ) |>
-  filter(age <= 31)
+  )
 
 ```
 
@@ -129,14 +130,17 @@ Of those who lived to age 25 accident-free, 12.4% will experience a motor vehicl
 
 **c) Among those who survive to age 16, what is the probability of dying without experiencing an accident by age 31?**
 
-Of those who survived to age 16, 1.37% will die by age 31 without experiencing a motor vehicle accident.
+Of those who survived to age 16, 1.02% will die by age 31 without experiencing a motor vehicle accident.
 
 ```{r acc_3}
 #| echo: true
 
-# The lxV calculates the number of people who have not experienced
-# event yet (death or motor vehicle accident)
-(df$lx[df$age == 16] - df$lx[df$age == 31]) / df$lx[df$age == 16]
+num <- df |>
+  filter(age != 31) |>
+  summarise(sum = sum(dx)) |>
+  pull()
+
+num / 85000
 
 ```
 
