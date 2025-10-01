@@ -148,4 +148,4 @@ The probability of folks in accidents is inversely correlated with overall death
 
 The github link for this class and assignment can be found [here](https://github.com/frumh002/Advanced-Demographic-Methods/tree/main).
 
-I shared this in our class whatsapp group chat.
+I shared this with Alyssa Mugavero.
