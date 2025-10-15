@@ -1,0 +1,615 @@
+---
+title: "SOC 756: Problem Set 5"
+
+author: 
+  - "Mateo Frumholtz"
+
+bibliography: references.bib
+
+date: "`r Sys.Date()`"
+date-format: long
+
+format: 
+  pdf:
+    fig-pos: "H"
+    number-sections: true
+    colorlinks: true
+    geometry: 
+      - margin = 1.25in 
+
+execute:
+  echo: false
+  warning: false
+  error: false
+  
+cap-location: bottom
+---
+
+
+```{r prep}
+rm(list = ls())
+
+# Install Needed Packages -------------------------------------------------
+
+library(tidyverse)
+library(readxl)
+library(summarytools)
+library(here)
+library(ggtext)
+library(gt)
+library(gtExtras)
+
+
+```
+
+
+```{r fonts} 
+
+knitr::opts_chunk$set(dev = "ragg_png", dpi = 400)
+
+```
+
+
+The github link for this class and assignment can be found [here](https://github.com/frumh002/Advanced-Demographic-Methods/tree/main).
+
+
+**1. The following data describe the U.S. population in 1997. The life table values come from a female life table with a radix of 100,000.**
+
+
+```{r lt_tbl}
+
+df <- tibble(
+  age = c(
+    10,
+    15,
+    20,
+    25,
+    30,
+    35,
+    40,
+    45
+  ),
+  females = c(
+    9315000,
+    9302000,
+    8591000,
+    9446000,
+    10447000,
+    11373000,
+    10800000,
+    9409000
+  ),
+  all_births = c(
+    10121,
+    483220,
+    942048,
+    1069436,
+    886798,
+    409710,
+    76084,
+    3333
+  ),
+  female_births = c(
+    4899,
+    236207,
+    460534,
+    523179,
+    432638,
+    200533,
+    37288,
+    1617
+  ),
+  nLx = c(
+    495678,
+    494913,
+    493741,
+    492428,
+    490757,
+    488395,
+    484977,
+    479969
+  ),
+  lx = c(
+    99174,
+    99083,
+    98868,
+    98624,
+    98336,
+    97945,
+    97381,
+    96561
+  )
+)
+
+```
+
+
+```{r lt_methods}
+#| echo: true
+
+lt <- df |>
+  mutate(
+    # age-specific fertility rate
+    nFx = all_births / females,
+    # age-specific reproduction rate
+    nFfx = female_births / females,
+    nFfxnLx = nFfx * nLx,
+    # mean age maternity schedule
+    xam = nFfx * (age + 5 / 2)
+  )
+
+```
+
+**A. What was the Crude Birth Rate in the United States in 1997?**
+
+The CBR in the US 1997 was 0.0145, or 14.5 children per 1,000 people.
+
+```{r cbr}
+#| echo: true
+
+tot_pop <- 130783000 + 137001000
+num <- sum(lt$all_births)
+
+num / tot_pop
+
+```
+
+**B. What was the General Fertility Rate in the United States in 1997? By what factor does the GFR differ from the CBR and why?**
+
+The GFR in the US 1997 was 0.0559, or 55.9 children per 1,000. This represents 3.86 times the CBR estimates above. This make sense given that women of child-bearing age make up 26% of the population (the inverse of 3.86).
+
+```{r gfr}
+#| echo: true
+
+denom <- sum(lt$females[lt$age >= 15])
+num <- sum(lt$all_births)
+
+num / denom
+
+(num / denom) / (num / tot_pop)
+
+denom / tot_pop
+
+```
+
+
+**C. Calculate and graph the age-specific fertility rates in the United States in 1997.**
+
+
+```{r asfr}
+#| fig-width: 8
+#| fig-height: 6
+#| fig-cap: "Age-Specific Fertility Rates, US Women 1997."
+#| label: fig-asfr
+
+lt |>
+  ggplot() +
+  aes(x = age, y = nFx) +
+  geom_line(
+    color = "#2c7da0",
+    linewidth = 1.2
+  ) +
+  labs(
+    title = "Age-Specific Fertility Rates",
+    subtitle = "US Females 1997",
+    x = "Age",
+    y = "Fertility Rate",
+    caption = "Data: 1997 US Women Life Tables"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.margin = margin(10, 10, 10, 10),
+    plot.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    panel.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    legend.key.height = unit(0.5, "lines"),
+    legend.key.width = unit(7, "lines"),
+    legend.text.position = "top",
+    legend.text = element_markdown(
+      face = "bold",
+      size = 10,
+      margin = margin(t = 5),
+      family = "Fira Sans"
+    ),
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 14,
+      color = "black",
+      face = "bold",
+      family = "Fira Sans",
+      margin = margin(5, 0, 10, 0)
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      size = 10,
+      color = "grey30",
+      margin = margin(5, 0, 10, 0),
+      family = "Fira Sans"
+    ),
+    plot.caption = element_text(
+      color = "grey30",
+      margin = margin(t = 10, b = 0, unit = "pt"),
+      hjust = 1,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    strip.text = element_text(
+      color = "grey30",
+      hjust = 0.5,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.title = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      margin = margin(5, 0, 0, 0),
+      family = "Fira Sans"
+    ),
+    axis.text = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.line = element_line(
+      color = "grey30",
+    )
+  )
+
+```
+
+
+**D. Calculate and interpret the Total Fertility Rate in the United States in 1997.**
+
+In 1997, the TFR in the US was 2.021. This means that on average, each women was having 2.021 children.
+
+```{r tfr}
+#| echo: true
+
+sum(lt$nFx) * 5
+
+```
+
+**E. Calculate and interpret the Gross Reproduction Rate (GRR) in the United States in 1997.**
+
+Thought experiment using the real data below:
+
+The GRR in the US 1997 was 0.9879. This represents the number of female births the average woman has if she lives through the end of her reproductive life. This is also fairly close to the estimate calculated above with the assumed SRB.
+
+```{r grr_2}
+#| echo: true
+
+sum(lt$nFfx) * 5
+
+```
+
+
+
+**F. Calculate and interpret the Net Reproduction Rate (NRR) in the United States in 1997.**
+
+The NRR in the US 1997 was 0.9726. This represents the average number of daughters that women in the 1997 period are bearing. On average, women are bearing fewer than 1 daughter, so their future cohorts will be smaller. 
+
+```{r nrr_2}
+#| echo: true
+
+sum(lt$nFfxnLx) / 100000
+
+```
+
+
+**G. How close is your answer in F to the NRR you would approximate by NRR = p(Am) x GRR? What is the value of this approximation?**
+
+We can estimate different types of p(Am):
+
+```{r pam}
+#| echo: true
+
+am <- sum(lt$xam) / sum(lt$nFfx)
+
+# Using regression
+model <- lm(lx ~ age, data = lt)
+
+pam_regress <- predict(model, newdata = data.frame(age = am)) / 100000
+
+# Using linear interpolation
+pam_interp <- approx(lt$age, lt$lx, xout = am)$y / 100000
+
+
+```
+
+The NRR we get above was 0.9726, which is similar but not exactly the same as that estimated by p(Am) * GRR. The exact similarity depends on if we use regression or interpolation. But we get estimates of 0.971 with regression and 0.9732 with linear interpolation.
+
+```{r nrr_3}
+#| echo: true
+
+pam_regress * 0.9879071
+
+pam_interp * 0.9879071
+
+```
+
+
+**The mean age of the maternity schedule can be obtained as follows:**
+
+$$
+A_m = \frac{\int_{\alpha{}}^{\beta{}}\;m(a)\;a\;da}{\int_{\alpha{}}^{\beta{}}\;m(a)\;da} = \frac{\sum{_{x = \alpha{}}^{\beta{}-n}}\;_nF_x^F*(x + \frac{n}{2})}{\sum{_{x = \alpha{}}^{\beta{}-n}}\;_nF_x^F}
+$$
+
+
+**You may assume that l(x) is linear within the intervals (follows the form l(x)=a+bx) to interpolate the value of l(Am) if needed.**
+
+**2. In hypothetical population Tau, the fecund period is 250 months, the fecundability of all women is 0.2 at all ages during the fecund period, the average anovulatory period after pregnancy is 13 months, the duration of aborted pregnancies is 2 months and the post-abortion anovulatory period is 3 months.**
+
+
+**Suppose that eleven possible contraceptive techniques are being considered for a cohort of women. The effectiveness of these techniques range from 0.45 to 0.95 in increments of 0.05.**
+
+
+**Using equation 1, graph the expected TFR by contraceptive effectiveness, both in the absence of abortion and in the presence of a 1:1 ratio of abortions to live births. Graph the percent decrease in the TFR implied by the presence of abortion by contraceptive effectiveness. Interpret both graphs.**
+
+
+$$
+TFR = \frac{L}{\left[\frac{1}{p(1-e)}\right] + S + K\left[\left[\frac{1}{p(1-e)}\right] + S^*\right]}
+$$
+
+Where:
+
+- L is the average length of a womens reproductive period
+- S is the sterile period
+- p is fecundability 
+- e is contraceptive effectiveness
+- K is the ratio of abortions to live births
+
+
+```{r abrt}
+#| echo: true
+
+no_abortion <- function(L, S, p, e) {
+  tfr <- L / ((1 / (p * (1 - e))) + 9 + S)
+}
+
+abortion <- function(L, S, S_p, abrt_preg, p, e, K) {
+  tfr <- L /
+    ((1 / (p * (1 - e))) +
+      9 +
+      abrt_preg +
+      S_p +
+      (K * ((1 / (p * (1 - e)) + S))))
+}
+
+abrt <- tibble(
+  e = seq(0.45, 0.95, 0.05),
+  L = 250,
+  p = 0.2,
+  S = 13,
+  abrt_preg = 2,
+  S_p = 3,
+  K = 1
+) |>
+  mutate(
+    no_abort = no_abortion(L, S, p, e),
+    abort = abortion(L, S, S_p, abrt_preg, p, e, K)
+  )
+
+```
+
+
+@fig-tfr_abrt shows the total fertility rate by contraceptive effectiveness in the presence and absence of abortions. Across all contraceptive effectiveness rates, the TFR is lower in the presence of abortion than absence. 
+
+@fig-tfr_abrt_diff shows the percent decrease in TFR across contraceptive effectiveness in the presence of abortions. TFR decreases more as contraceptive use increases in the presence of abortion.
+
+
+```{r tfr_abrt_fig1}
+#| fig-width: 6
+#| fig-height: 5
+#| fig-cap: "Comparing TFR with contraceptive in presence and absence of abortions."
+#| label: fig-tfr_abrt
+
+abrt |>
+  select(e, no_abort, abort) |>
+  pivot_longer(c(-e), names_to = "type", values_to = "tfr") |>
+  mutate(
+    tfr = tfr,
+    type = case_when(
+      type == "abort" ~ "Abortion",
+      type == "no_abort" ~ "No Abortion"
+    )
+  ) |>
+  ggplot() +
+  aes(x = e, y = tfr, color = type) +
+  geom_line(
+    linewidth = 1.2
+  ) +
+  scale_color_manual(
+    values = c(
+      "#f6bd60",
+      "#f28482"
+    )
+  ) +
+  labs(
+    title = "TFR with contraceptive in presence and absence of abortions",
+    subtitle = "Tau population",
+    x = "Contraceptive Effectiveness",
+    y = "Total Fertility Rate"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.margin = margin(10, 10, 10, 10),
+    plot.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    panel.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    legend.key.height = unit(0.5, "lines"),
+    legend.key.width = unit(7, "lines"),
+    legend.text.position = "top",
+    legend.text = element_markdown(
+      face = "bold",
+      size = 10,
+      margin = margin(t = 5),
+      family = "Fira Sans"
+    ),
+    plot.title = element_text(
+      hjust = 0,
+      size = 14,
+      color = "black",
+      face = "bold",
+      family = "Fira Sans",
+      margin = margin(5, 0, 10, 0)
+    ),
+    plot.subtitle = element_textbox_simple(
+      hjust = 0,
+      size = 10,
+      color = "grey30",
+      margin = margin(5, 0, 10, 0),
+      family = "Fira Sans"
+    ),
+    plot.caption = element_text(
+      color = "grey30",
+      margin = margin(t = 10, b = 0, unit = "pt"),
+      hjust = 1,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    strip.text = element_text(
+      color = "grey30",
+      hjust = 0.5,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.title = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      margin = margin(5, 0, 0, 0),
+      family = "Fira Sans"
+    ),
+    axis.text = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.line = element_line(
+      color = "grey30",
+    )
+  )
+
+```
+
+
+
+```{r tfr_abrt_fig2}
+#| fig-width: 6
+#| fig-height: 5
+#| fig-cap: "Percent decrease of TFR with contraceptive in presence and absence of abortions."
+#| label: fig-tfr_abrt_diff
+
+abrt |>
+  select(e, no_abort, abort) |>
+  mutate(
+    # diff = no_abort - abort,
+    p_delt = (no_abort - abort) / no_abort
+  ) |>
+  ggplot() +
+  aes(x = e, y = p_delt) +
+  geom_line(
+    linewidth = 1.2,
+    color = "#2c7da0"
+  ) +
+  scale_y_continuous(
+    labels = scales::percent_format(accuracy = 1)
+  ) +
+  labs(
+    title = "TFR decrease with abortions by contraceptive efficacy",
+    subtitle = "TFR decreases more as contraceptive use increases in the presence of abortion in Tau population",
+    x = "Contraceptive Effectiveness",
+    y = "Percent Decrease in TFR"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.margin = margin(10, 10, 10, 10),
+    plot.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    panel.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    legend.key.height = unit(0.5, "lines"),
+    legend.key.width = unit(7, "lines"),
+    legend.text.position = "top",
+    legend.text = element_markdown(
+      face = "bold",
+      size = 10,
+      margin = margin(t = 5),
+      family = "Fira Sans"
+    ),
+    plot.title = element_text(
+      hjust = 0,
+      size = 14,
+      color = "black",
+      face = "bold",
+      family = "Fira Sans",
+      margin = margin(5, 0, 10, 0)
+    ),
+    plot.subtitle = element_textbox_simple(
+      hjust = 0,
+      size = 10,
+      color = "grey30",
+      margin = margin(5, 0, 10, 0),
+      family = "Fira Sans"
+    ),
+    plot.caption = element_text(
+      color = "grey30",
+      margin = margin(t = 10, b = 0, unit = "pt"),
+      hjust = 1,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    strip.text = element_text(
+      color = "grey30",
+      hjust = 0.5,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.title = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      margin = margin(5, 0, 0, 0),
+      family = "Fira Sans"
+    ),
+    axis.text = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.line = element_line(
+      color = "grey30",
+    )
+  )
+
+```
