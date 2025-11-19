@@ -1,0 +1,218 @@
+---
+title: "SOC 756: Problem Set 8"
+
+author: 
+  - "Mateo Frumholtz"
+
+bibliography: references.bib
+
+date: "`r Sys.Date()`"
+date-format: long
+
+format: 
+  pdf:
+    fig-pos: "H"
+    number-sections: true
+    colorlinks: true
+    geometry: 
+      - margin = 1.25in 
+
+execute:
+  echo: false
+  warning: false
+  error: false
+  
+cap-location: bottom
+---
+
+
+```{r prep}
+rm(list = ls())
+
+# Install Needed Packages -------------------------------------------------
+
+library(tidyverse)
+library(readxl)
+library(summarytools)
+library(here)
+library(ggtext)
+library(gt)
+library(gtExtras)
+
+# Import Datasets
+brazil <- read_excel(here("Data/ps8_Brazil.xlsx"), skip = 1) |>
+  rename(
+    age = Age,
+    y_1985 = "1985",
+    y_1995 = "1995",
+    y_2005 = "2005"
+  )
+
+```
+
+
+```{r fonts} 
+
+knitr::opts_chunk$set(dev = "ragg_png", dpi = 400)
+
+```
+
+
+The github link for this class and assignment can be found [here](https://github.com/frumh002/Advanced-Demographic-Methods/tree/main).
+
+
+# Part 1
+
+**This part of the homework is a continuation of Problem Set 7, but focusing on the Wednesday lecture of “Population Momentum, Introduction to Variable-r” unit. You may use any software program you like.**
+
+
+
+**1. Table 4 below (also on Canvas ps8_brazil_1985_2005.xlsx) includes the female population of Brazil in 1985, 1995, 2005. Calculate the age-specific mean annualized growth rates between 1985-1995 and between 1995-2005. Plot the two 1rx series. What do you notice? How do you interpret these patterns—i.e., what is likely happening to fertility and mortality in these windows?**
+
+@fig-asgr below shows the age-specific mean annualized grwoth rates between the two time points. The growth rate stays negative at younger ages for longer period in the later years cohort, and they also have higher growth rates at older ages. The growth rates overall seem very similar and mirror each other with a delay in age. These trends might indicate two things: 1) the shift to the right might indicate delayed fertility, and 2) the shift up at the older ages might indicate lower mortality rates at those age groups. 
+
+```{r}
+#| fig-width: 6
+#| fig-height: 5
+#| fig-cap: "Age-specific mean annualized growth rates, 1985-2005 Females Brazil"
+#| label: fig-asgr
+
+brazil |>
+  mutate(
+    rx_1985_1995 = log(y_1995 / y_1985) / 10,
+    rx_1995_2005 = log(y_2005 / y_1995) / 10,
+  ) |>
+  pivot_longer(
+    c(-age, -y_1985, -y_1995, -y_2005),
+    names_to = "rx",
+    values_to = "est"
+  ) |>
+  mutate(
+    rx = case_when(
+      rx == "rx_1985_1995" ~ "1985-1995",
+      rx == "rx_1995_2005" ~ "1995-2005",
+      TRUE ~ rx
+    )
+  ) |>
+  ggplot() +
+  aes(x = age, y = est, color = rx) +
+  geom_hline(
+    yintercept = 0,
+    color = "grey",
+    linewidth = 0.5
+  ) +
+  geom_line(
+    linewidth = 1.2
+  ) +
+  scale_y_continuous(
+    breaks = seq(-0.02, 0.08, 0.01)
+  ) +
+  scale_color_manual(
+    values = c(
+      "#f6bd60",
+      "#f28482"
+    )
+  ) +
+  labs(
+    title = "Age-specific mean annualized growth rates",
+    subtitle = "Females Brazil, 1985-2005",
+    x = "Age",
+    y = "Age-specific growth rates"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.margin = margin(10, 10, 10, 10),
+    plot.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    panel.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    legend.key.height = unit(0.5, "lines"),
+    legend.key.width = unit(7, "lines"),
+    legend.text.position = "top",
+    legend.text = element_markdown(
+      face = "bold",
+      size = 10,
+      margin = margin(t = 5),
+      family = "Fira Sans"
+    ),
+    plot.title = element_text(
+      hjust = 0,
+      size = 14,
+      color = "black",
+      face = "bold",
+      family = "Fira Sans",
+      margin = margin(5, 0, 10, 0)
+    ),
+    plot.subtitle = element_textbox_simple(
+      hjust = 0,
+      size = 10,
+      color = "grey30",
+      margin = margin(5, 0, 10, 0),
+      family = "Fira Sans"
+    ),
+    plot.caption = element_text(
+      color = "grey30",
+      margin = margin(t = 10, b = 0, unit = "pt"),
+      hjust = 1,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    strip.text = element_text(
+      color = "grey30",
+      hjust = 0.5,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.title = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      margin = margin(5, 0, 0, 0),
+      family = "Fira Sans"
+    ),
+    axis.text = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.line = element_line(
+      color = "grey30",
+    )
+  )
+
+```
+
+**2. In addition to the growth rates you calculated in (1), what would you need to calculate the NRR over this period? How might you find that information?**
+
+We might be able to use the equation below to estimate the NRR. We would need more information than we have though, which we might be able to get from CDC or Census information. 
+
+$$
+r = \frac{ln(NRR)}{T} \sim \frac{ln(pA_m) + ln(GRR)}{A_m} \sim \frac{ln(\sum_{15}^{45}{_5F_x\frac{_5L_x}{l_0}})}{A_m}
+$$
+
+
+
+# Part 2
+
+**3. In plain language, explain what demographers mean the tension between “selection” and “scarring.” Give an example to complement your explanation.**
+
+Selection refers to the mechanisms that bias outcomes in any specific direction, although usually positive. Scarring, on the other hand, refers to the damage that going through events might impart.
+
+As an example, migration is often thought of as a selection mechanism. The "Healthy Migrant Effect", as it is often called, refers to the selection on healthier individuals that uncoordinated migration results in. Similarly, the difference in health between migrants and non-migrants tends to converge over time, and sometimes worsen. This might suggest the effects of scarring, where the situations that led to the forced displacement itself might play long-term negative effects.
+
+
+**4. What is length-based sampling? Give an example of when length-based sampling can create unusual or unintuitive results and explain why/how length-based sampling creates these results.**
+
+Length-biased sampling is a selection mechanism that can occur when either the outcome or exposure we are measuring are a product of time. This bias leads us to sample our population in proportion to their survivability or size or probability of existing at a certain time point.
+
+We can imagine a situation where we are randomly surveying patients in a hospital to estimate the mean hospital length as of that day. Many people might go in and out in 1 day, but fewer people are likely staying for much longer stays. We might oversample those folks and get a higher mean than if we sampled everyone. 
+

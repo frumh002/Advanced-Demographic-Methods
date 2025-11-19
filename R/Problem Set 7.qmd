@@ -1,0 +1,595 @@
+---
+title: "SOC 756: Problem Set 7"
+
+author: 
+  - "Mateo Frumholtz"
+
+bibliography: references.bib
+
+date: "`r Sys.Date()`"
+date-format: long
+
+format: 
+  pdf:
+    fig-pos: "H"
+    number-sections: true
+    colorlinks: true
+    geometry: 
+      - margin = 1.25in 
+
+execute:
+  echo: false
+  warning: false
+  error: false
+  
+cap-location: bottom
+---
+
+
+```{r prep}
+rm(list = ls())
+
+# Install Needed Packages -------------------------------------------------
+
+library(tidyverse)
+library(readxl)
+library(summarytools)
+library(here)
+library(ggtext)
+library(gt)
+library(gtExtras)
+
+# Import Datasets
+russia <- read.csv(here("Data/ps7_Russia.csv"))
+china <- read.csv(here("Data/ps7_China.csv"))
+india <- read.csv(here("Data/ps7_India.csv"))
+
+```
+
+
+```{r fonts} 
+
+knitr::opts_chunk$set(dev = "ragg_png", dpi = 400)
+
+```
+
+# Part 2
+
+The github link for this class and assignment can be found [here](https://github.com/frumh002/Advanced-Demographic-Methods/tree/main).
+
+
+**3. Using the data in from ps7_Russia.csv (on the class webpage), compute the intrinsic rate of natural increase for the Russian female population of 2000. Use the procedure described in Box 7.1 of the Preston textbook. Start with r0 = ln(NRR) / 27, and do three iterations. Use r3 as your final estimate of the intrinsic growth rate.**
+
+```{r}
+#| echo: true
+
+df_russia <- russia |>
+  rename(
+    age = age_x,
+    nLxF = nLx_F
+  ) |>
+  mutate(
+    nma = fem_births_1000s / female_pop_1000s
+  ) |>
+  filter(
+    between(age, 15, 45)
+  ) |>
+  mutate(
+    nLanma = nma * nLa
+  )
+
+nrr <- sum(df_russia$nLanma)
+
+r0 <- log(nrr) / 27
+
+russia_r0 <- df_russia |>
+  mutate(
+    r0 = exp(-r0 * (age + 2.5)) * nLanma
+  )
+
+y0 <- sum(russia_r0$r0)
+
+r1 <- r0 + ((y0 - 1) / 27)
+
+russia_r1 <- russia_r0 |>
+  mutate(
+    r1 = exp(-r1 * (age + 2.5)) * nLanma
+  )
+
+y1 <- sum(russia_r1$r1)
+
+r2 <- r1 + ((y1 - 1) / 27)
+
+russia_r2 <- russia_r1 |>
+  mutate(
+    r2 = exp(-r2 * (age + 2.5)) * nLanma
+  )
+
+y2 <- sum(russia_r2$r2)
+
+r3 <- r2 + ((y2 - 1) / 27)
+
+russia_r3 <- russia_r2 |>
+  mutate(
+    r3 = exp(-r3 * (age + 2.5)) * nLanma
+  )
+
+y3 <- sum(russia_r3$r3)
+
+print(russia_r3 |> select(age, r0, r1, r2, r3))
+
+
+print(r3)
+
+```
+
+
+**4. Compute the real mean length of generation in the Russian population of 2000: the number of years required for the population to grow (at the intrinsic growth rate) by the factor equal to the 2000 net reproduction rate. In other words, solve for T in the equation NRR2000 = erT.**
+  
+$$
+NRR_{2000} = e^{rT}
+$$
+  
+$$
+T = \frac{ln(NRR)}{r}
+$$
+  
+```{r}
+#| echo: true
+
+log(nrr) / r3
+
+```
+
+
+**5. Compute the intrinsic age distribution of the Russian female population in 2000, using the procedure described in Box 7.2 of the textbook. Assume that e100 = 2.5 years, or the age to which the e-ra function is applied when a=100 is 102.5.**
+
+```{r}
+#| echo: true
+
+seb_russia <- russia |>
+  rename(
+    age = age_x,
+    nLxF = nLx_F
+  ) |>
+  mutate(
+    nma = fem_births_1000s / female_pop_1000s
+  ) |>
+  mutate(
+    nLanma = nma * nLa,
+    ncactual = female_pop_1000s / sum(female_pop_1000s),
+    # er = case_when(
+    #   age != 100 ~ exp(-r3 * (age + 2.5)) * (nLa / 100000),
+    #   TRUE ~ exp(-r3 * (2.5)) * (nLa / 100000)
+    # ),
+    er = exp(-r3 * (age + 2.5)) * (nLa / 100000),
+    ncstable = 1 / sum(er) * er
+  ) |>
+  select(age, ncactual, ncstable)
+
+seb_russia
+
+```
+
+
+**6. Graph both the actual and the intrinsic age distributions.  Interpret the difference between the age distribution in 2000 and the age distribution of the stable equivalent population. The CRNI of the Russian population was -0.006 in 2000. Compare this rate with the intrinsic growth rate you calculated in (1); is the difference consistent with what you observe in the graph?  Why?**
+
+@fig-stable_russia compares the actual and stable age distributions for Russia in 2000. The age distribution in 2000 seems less uniform compared to the stable estimates, but we still observe the inverse of mortality curves. The CRNI of -0.006 in 2000 is a bit different from the -0.0231 we calculated in 1. This makes sense given the actual observed r is further from an r = 0 which is more uniform. 
+
+```{r}
+#| fig-width: 6
+#| fig-height: 5
+#| fig-cap: "Comparing Actual and Intrinsic Age Distribution"
+#| label: fig-stable_russia
+
+seb_russia |>
+  rename(Actual = ncactual, Stable = ncstable) |>
+  pivot_longer(c(-age), names_to = "type", values_to = "est") |>
+  ggplot() +
+  aes(x = age, y = est, fill = type) +
+  geom_col(
+    position = position_dodge()
+  ) +
+  # facet_wrap(~type) +
+  scale_fill_manual(
+    values = c(
+      "#f6bd60",
+      "#f28482"
+    )
+  ) +
+  labs(
+    title = "Comparing Actual and Intrinsic Age Distribution",
+    subtitle = "Russia, 2000",
+    x = "Age",
+    y = "Percent of the Population"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.margin = margin(10, 10, 10, 10),
+    plot.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    panel.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    legend.key.height = unit(0.5, "lines"),
+    legend.key.width = unit(7, "lines"),
+    legend.text.position = "top",
+    legend.text = element_markdown(
+      face = "bold",
+      size = 10,
+      margin = margin(t = 5),
+      family = "Fira Sans"
+    ),
+    plot.title = element_text(
+      hjust = 0,
+      size = 14,
+      color = "black",
+      face = "bold",
+      family = "Fira Sans",
+      margin = margin(5, 0, 10, 0)
+    ),
+    plot.subtitle = element_textbox_simple(
+      hjust = 0,
+      size = 10,
+      color = "grey30",
+      margin = margin(5, 0, 10, 0),
+      family = "Fira Sans"
+    ),
+    plot.caption = element_text(
+      color = "grey30",
+      margin = margin(t = 10, b = 0, unit = "pt"),
+      hjust = 1,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    strip.text = element_text(
+      color = "grey30",
+      hjust = 0.5,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.title = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      margin = margin(5, 0, 0, 0),
+      family = "Fira Sans"
+    ),
+    axis.text = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.line = element_line(
+      color = "grey30",
+    )
+  )
+
+```
+
+
+**7. Using data from ps7_India_2000.csv and ps7_China_2000.csv, calculate population momentum (for the female population only) for India and China. Interpret your results. Explain why China would eventually have a larger female population than India, in spite of its smaller number of annual birth in the ultimate stationary population.  Note: when calculating w(a), pay attention to the difference between y and a as given in the Preston text, Box 7.3.**
+
+The population momentum for India is 1.44 and for China 1.25. Even though India's momentum is larger, it has larger mortality forces leading to much shorter life expectancy. Over time, many more people will die in India compared to China which would likely mean more women are alive in China. 
+
+```{r}
+#| echo: true
+
+e0f_india <- sum(india$X5La_radix100000) / 100000
+
+india_A <- india |>
+  rename(
+    nma = X5ma,
+    nLa = X5La_radix100000,
+    Nf = fem_pop,
+    nLa_rad = X5La_radix1
+  ) |>
+  filter(between(age, 0, 45)) |>
+  mutate(
+    nLa_rad = nLa / 100000,
+    nrr = nma * nLa,
+    mprime = nma / sum(nrr, na.rm = T),
+    A = (age + 2.5) * mprime * nLa,
+    Lm = mprime * nLa,
+    cumLM = cumsum(replace_na(Lm, 0)),
+    wa = case_when(
+      age > 10 ~ (((nLa / 2) * mprime) + (sum(Lm, na.rm = T) - cumLM)) /
+        sum(A, na.rm = T),
+      age <= 10 ~ 1 / sum(A, na.rm = T),
+      TRUE ~ NA
+    ),
+    B = Nf / (nLa_rad / 5) * wa
+  )
+
+(sum(india_A$B) * e0f_india) / (sum(india$fem_pop))
+
+
+```
+
+
+```{r}
+#| echo: true
+
+e0f_china <- sum(china$X5La_radix100000) / 100000
+
+china_A <- china |>
+  rename(
+    nma = X5ma,
+    nLa = X5La_radix100000,
+    Nf = fem_pop,
+    nLa_rad = X5La_radix1
+  ) |>
+  filter(between(age, 0, 45)) |>
+  mutate(
+    nLa_rad = nLa / 100000,
+    nrr = nma * nLa,
+    mprime = nma / sum(nrr, na.rm = T),
+    A = (age + 2.5) * mprime * nLa,
+    Lm = mprime * nLa,
+    cumLM = cumsum(replace_na(Lm, 0)),
+    wa = case_when(
+      age > 10 ~ (((nLa / 2) * mprime) + (sum(Lm, na.rm = T) - cumLM)) /
+        sum(A, na.rm = T),
+      age <= 10 ~ 1 / sum(A, na.rm = T),
+      TRUE ~ NA
+    ),
+    B = Nf / (nLa_rad / 5) * wa
+  )
+
+(sum(china_A$B) * e0f_china) / (sum(china$fem_pop))
+
+
+```
+
+**8. Graph and compare the function 5wa for both populations. Do the same for the function $_5c_a$ / $_5c_a^{(stat)}$. Using the information contained in these graphs, explain (a) why population momentum is greater than 1.00 in both countries, and (b) why population momentum is larger in India than in China.**
+
+
+Population momentum is greater than 1 becuase the age distribution is higher than the stationary population age distribution at ages when wa is high. In India especially, the age distribution is much higher at levels of wa that are similar, thus a larger momentum.
+
+
+```{r}
+#| fig-width: 6
+#| fig-height: 5
+#| fig-cap: "wa by Country"
+#| label: fig-wa
+
+india_A |>
+  mutate(
+    country = "India"
+  ) |>
+  rbind(china_A |> mutate(country = "China")) |>
+  select(age, wa, country) |>
+  ggplot() +
+  aes(x = age, y = wa, color = country) +
+  geom_line(
+    linewidth = 1.2
+  ) +
+  scale_color_manual(
+    values = c(
+      "#f6bd60",
+      "#f28482"
+    )
+  ) +
+  labs(
+    title = "wa by Country",
+    subtitle = "China and India",
+    x = "Age",
+    y = "wa"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.margin = margin(10, 10, 10, 10),
+    plot.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    panel.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    legend.key.height = unit(0.5, "lines"),
+    legend.key.width = unit(7, "lines"),
+    legend.text.position = "top",
+    legend.text = element_markdown(
+      face = "bold",
+      size = 10,
+      margin = margin(t = 5),
+      family = "Fira Sans"
+    ),
+    plot.title = element_text(
+      hjust = 0,
+      size = 14,
+      color = "black",
+      face = "bold",
+      family = "Fira Sans",
+      margin = margin(5, 0, 10, 0)
+    ),
+    plot.subtitle = element_textbox_simple(
+      hjust = 0,
+      size = 10,
+      color = "grey30",
+      margin = margin(5, 0, 10, 0),
+      family = "Fira Sans"
+    ),
+    plot.caption = element_text(
+      color = "grey30",
+      margin = margin(t = 10, b = 0, unit = "pt"),
+      hjust = 1,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    strip.text = element_text(
+      color = "grey30",
+      hjust = 0.5,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.title = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      margin = margin(5, 0, 0, 0),
+      family = "Fira Sans"
+    ),
+    axis.text = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.line = element_line(
+      color = "grey30",
+    )
+  )
+
+```
+
+
+```{r}
+#| echo: true
+
+china_ratio <- china |>
+  rename(
+    nma = X5ma,
+    nLa = X5La_radix100000,
+    Nf = fem_pop,
+    nLa_rad = X5La_radix1
+  ) |>
+  select(age, Nf, nLa, nLa_rad) |>
+  mutate(
+    nLa_rad = nLa / 100000,
+    ncactual = Nf / sum(Nf),
+    ncstationary = nLa_rad / e0f_china,
+    nc_ratio = ncactual / ncstationary,
+    country = "China"
+  )
+
+india_ratio <- india |>
+  rename(
+    nma = X5ma,
+    nLa = X5La_radix100000,
+    Nf = fem_pop,
+    nLa_rad = X5La_radix1
+  ) |>
+  select(age, Nf, nLa, nLa_rad) |>
+  mutate(
+    nLa_rad = nLa / 100000,
+    ncactual = Nf / sum(Nf),
+    ncstationary = nLa_rad / e0f_india,
+    nc_ratio = ncactual / ncstationary,
+    country = "India"
+  )
+
+ratios <- rbind(china_ratio, india_ratio)
+
+```
+
+
+```{r}
+#| fig-width: 6
+#| fig-height: 5
+#| fig-cap: "nca ratios"
+#| label: fig-ratios
+
+ratios |>
+  ggplot() +
+  aes(x = age, y = nc_ratio, color = country) +
+  geom_line(
+    linewidth = 1.2
+  ) +
+  scale_color_manual(
+    values = c(
+      "#f6bd60",
+      "#f28482"
+    )
+  ) +
+  labs(
+    title = "nCa Ratios",
+    subtitle = "China and India",
+    x = "Age",
+    y = "nca Ratio"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.margin = margin(10, 10, 10, 10),
+    plot.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    panel.background = element_rect(
+      fill = "white",
+      color = NA
+    ),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    legend.key.height = unit(0.5, "lines"),
+    legend.key.width = unit(7, "lines"),
+    legend.text.position = "top",
+    legend.text = element_markdown(
+      face = "bold",
+      size = 10,
+      margin = margin(t = 5),
+      family = "Fira Sans"
+    ),
+    plot.title = element_text(
+      hjust = 0,
+      size = 14,
+      color = "black",
+      face = "bold",
+      family = "Fira Sans",
+      margin = margin(5, 0, 10, 0)
+    ),
+    plot.subtitle = element_textbox_simple(
+      hjust = 0,
+      size = 10,
+      color = "grey30",
+      margin = margin(5, 0, 10, 0),
+      family = "Fira Sans"
+    ),
+    plot.caption = element_text(
+      color = "grey30",
+      margin = margin(t = 10, b = 0, unit = "pt"),
+      hjust = 1,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    strip.text = element_text(
+      color = "grey30",
+      hjust = 0.5,
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.title = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      margin = margin(5, 0, 0, 0),
+      family = "Fira Sans"
+    ),
+    axis.text = element_text(
+      color = "grey30",
+      size = 10,
+      face = "bold",
+      family = "Fira Sans"
+    ),
+    axis.line = element_line(
+      color = "grey30",
+    )
+  )
+
+```
+
